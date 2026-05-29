@@ -2,7 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import math
 from data import generate_sapp_data
-
+#test commit
 # STEP 1: 4.1 Step 1 — Preference-maximal assignment (for equal and unequal seminar sizes)
 def step1_preference_maximal_assignment(I, J, p, r_min, r_max):
     """
