@@ -139,7 +139,7 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
     dict
         Dictionary with the resulting assignment {student: seminar} if an optimal solution is found; None otherwise.
     """
-    model = gp.Model("SAPP_Step2_Diversity")
+    model = gp.Model("SAPP_Step2_Diversity_Equal")
     model.Params.OutputFlag = 1
     
     num_students = len(I)
@@ -189,137 +189,89 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     Step 2: Preference-maximal and maximally diverse assignment (Unequal-sized).
 
     Parameters:
-    I       : list  - student identifiers
-    J       : list  - seminar identifiers
-    p       : dict  - preferences p[i, j]
-    r_lb    : dict  - minimum seminar size r_lb[j]
-    r_up    : dict  - maximum seminar size r_up[j]
-    F_step1 : float - optimal objective value from Step 1
-    a       : dict  - academic score a[i] for each student
+    I : list
+        Set of student identifiers
+    J : list
+        Set of seminar identifiers
+    p : dict
+        Preferences dictionary where keys are tuples (i, j)
+    r_lb : dict 
+        Minimum seminar size r_lb[j]
+    r_up : dict 
+        Maximum seminar size r_up[j]
+    F_step1 : float
+        The optimal objective value from Step 1
+    a : dict
+        Attributes dictionary for students
     Returns:
-    (Z, assignment) or (None, None)
+    dict
+        Dictionary with the resulting assignment {student: seminar} if an optimal solution is found; None otherwise.
     """
     model = gp.Model("SAPP_Step2_Diversity_Unequal")
     model.Params.OutputFlag = 1
 
-    # All valid seminar sizes per seminar j
-    # sizes[j] = [r_lb[j], r_lb[j]+1, ..., r_up[j]]
+    """All valid seminar sizes per seminar j
+    sizes[j] = [r_lb[j], r_lb[j]+1, ..., r_up[j]] """
     sizes = {j: list(range(r_lb[j], r_up[j]+1)) for j in J}
 
-    # Block positions within a given size l_bar: l in {1, ..., l_bar}
-    # Diversity weights depend on block position within the seminar of size l_bar
-    # c_weights[l_bar][l] = weight for block l in a seminar of size l_bar
-    c_weights ={l_bar: calculate_diversity_weights(l_bar) for j in J for l_bar in sizes[j]}
+    """ Block positions within a given size l_bar: l in {1, ..., l_bar}
+    Diversity weights depend on block position within the seminar of size l_bar
+    c_weights[l_bar][l] = weight for block l in a seminar of size l_bar """
+    c_weights ={l_bar: calculate_diversity_weights(l_bar) for j in J for l_bar in sizes[j]} 
 
-    # --- Variables ---
+    # 1. Variables 
 
     # x[i, j] = 1 if student i is assigned to seminar j  (Eq. 25)
     x = model.addVars(I, J, vtype=GRB.BINARY, name="x")
-
     # w[j, l_bar] = 1 if seminar j has exactly l_bar students  (Eq. 24)
-    w = model.addVars(
-        [(j, l_bar) for j in J for l_bar in sizes[j]],
-        vtype=GRB.BINARY, name="w"
-    )
+    w = model.addVars( [(j, l_bar) for j in J for l_bar in sizes[j]],
+        vtype=GRB.BINARY, name="w"    )
 
     # y_bar[i, j, l_bar, l] = 1 if student i is in block l of seminar j
-    #                          when seminar j has l_bar students  (Eq. 17)
-    # Only defined for valid (j, l_bar, l) combinations
-    y_bar = model.addVars(
-        [(i, j, l_bar, l)
-         for i in I
-         for j in J
-         for l_bar in sizes[j]
-         for l in range(1, l_bar + 1)],
-        vtype=GRB.CONTINUOUS,   # continuous suffices; bounded by w in Eq. 21
-        lb=0.0, ub=1.0,
-        name="y_bar"
-    )
+    #when seminar j has l_bar students  (Eq. 17)    
+    y_bar = model.addVars([(i, j, l_bar, l) for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)],
+        vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="y_bar")   )
 
-    # --- Objective (Eq. 17) ---
+    #2. Objective (Eq. 17)
     model.setObjective(
-        gp.quicksum(
-            c_weights[l_bar][l] * a[i] * y_bar[i, j, l_bar, l]
-            for i in I
-            for j in J
-            for l_bar in sizes[j]
-            for l in range(1, l_bar + 1)
-        ),
-        GRB.MAXIMIZE
-    )
+        gp.quicksum(c_weights[l_bar][l] * a[i] * y_bar[i, j, l_bar, l] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
+        GRB.MAXIMIZE)
 
-    # --- Constraints ---
-
-    # (9) Lock in Step 1 preference value
-    model.addConstr(
-        gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1,
-        name="MaintainPreferences"
-    )
+    #3. Constraints
+     # (9) Maintain preferences F from Step 1
+    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1, name="MaintainPreferences")
 
     # (18) Each student assigned to exactly one seminar
-    model.addConstrs(
-        (gp.quicksum(x[i, j] for j in J) == 1 for i in I),
-        name="SingleAssignment"
-    )
+    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I), name="SingleAssignment")
 
-    # (19) Each block l (up to r_lb[j]) is filled by at most one student,
-    #      across all valid seminar sizes l_bar >= l
-    model.addConstrs(
-        (gp.quicksum(
-            y_bar[i, j, l_bar, l]
-            for i in I
-            for l_bar in sizes[j] if l_bar >= l
-        ) <= 1
+    # (19) Each block l (up to r_lb[j]) is filled by at most one student across all valid seminar sizes l_bar >= l
+    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for i in I for l_bar in sizes[j] if l_bar >= l) <= 1
          for j in J
          for l in range(1, r_lb[j] + 1)),
-        name="BlockCapacity"
-    )
+        name="BlockCapacity")
 
-    # (20) Student i in seminar j iff they occupy exactly one block across
-    #      all valid (l_bar, l) combinations for that seminar
-    model.addConstrs(
-        (gp.quicksum(
-            y_bar[i, j, l_bar, l]
-            for l_bar in sizes[j]
-            for l in range(1, l_bar + 1)
-        ) == x[i, j]
-         for i in I for j in J),
-        name="StudentBlockLink"
-    )
+    # (20) Student i in seminar j iff they occupy exactly one block across all valid (l_bar, l) combinations for that seminar
+    model.addConstrs( (gp.quicksum( y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
+        name="StudentBlockLink")
 
-    # (21) y_bar[i,j,l_bar,l] <= w[j, l_bar]
-    #      Can only place student in block (l_bar, l) if seminar j has size l_bar
-    model.addConstrs(
-        (y_bar[i, j, l_bar, l] <= w[j, l_bar]
-         for i in I
-         for j in J
-         for l_bar in sizes[j]
-         for l in range(1, l_bar + 1)),
-        name="BlockSizeLink"
-    )
+    # (21) y_bar[i,j,l_bar,l] <= w[j, l_bar  Can only place student in block (l_bar, l) if seminar j has size l_bar
+    model.addConstrs( (y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
+        name="BlockSizeLink")
 
     # (22) The chosen size l_bar must equal the actual number of students in j
-    model.addConstrs(
-        (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])
-         == gp.quicksum(x[i, j] for i in I)
-         for j in J),
-        name="SeminarSizeConsistency"
-    )
+    model.addConstrs( (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])== gp.quicksum(x[i, j] for i in I) for j in J),
+        name="SeminarSizeConsistency")
 
     # (23) Exactly one size is chosen per seminar
-    model.addConstrs(
-        (gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
-        name="OneSizePerSeminar"
-    )
+    model.addConstrs( (gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
+        name="OneSizePerSeminar")
 
     model.optimize()
 
     if model.Status == GRB.OPTIMAL:
-        Z = model.ObjVal
-        optimal_assignment = {
-            i: j for i in I for j in J if x[i, j].X > 0.5
-        }
-        return Z, optimal_assignment
+        Z_u_1 = model.ObjVal
+        optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
+        return Z_u_1, optimal_assignment
 
     return None, None
 # Step 3: Balanced Assignment (Equal-sized)
@@ -347,7 +299,7 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
     dict
         Dictionary with the final balanced assignment {student: seminar}.
     """
-    model = gp.Model("SAPP_Step3_Balancing")
+    model = gp.Model("SAPP_Step3_Balancing_Equal")
     model.Params.OutputFlag = 1
     
     num_students = len(I)
@@ -411,7 +363,6 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
 def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
     """
     Step 3: Preference-maximal, maximally diverse, and balanced assignment (Unequal-sized).
-
     Parameters:
     I : list
         Set of student identifiers
@@ -419,14 +370,16 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
         Set of seminar identifiers
     p : dict
         Preferences dictionary where keys are tuples (i, j)
-    r : dict
-        Seminar size bounds, r[j] = (r_lb, r_ub)
+    r_lb : dict 
+        Minimum seminar size r_lb[j]
+    r_up : dict 
+        Maximum seminar size r_up[j]
     F_step1 : float
-        The optimal preference value from Step 1
+        The optimal objective value from Step 1
     Z_step2 : float
         The optimal diversity score from Step 2
     a : dict
-        Attributes dictionary for students (academic grades)
+        Attributes dictionary for students
 
     Returns:
     float
@@ -445,104 +398,54 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
 
     # 1. Variables (same as Step 2 unequal)
     x = model.addVars(I, J, vtype=GRB.BINARY, name="x")
-    w = model.addVars(
-        [(j, l_bar) for j in J for l_bar in sizes[j]],
-        vtype=GRB.BINARY, name="w"
-    )
+    w = model.addVars([(j, l_bar) for j in J for l_bar in sizes[j]],
+        vtype=GRB.BINARY, name="w")
     y_bar = model.addVars(
-        [(i, j, l_bar, l)
-         for i in I
-         for j in J
-         for l_bar in sizes[j]
-         for l in range(1, l_bar + 1)],
-        vtype=GRB.CONTINUOUS,
-        lb=0.0, ub=1.0,
-        name="y_bar"
-    )
+        [(i, j, l_bar, l) for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)],
+        vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="y_bar")
 
     J_pairs = [(J[idx_j], J[idx_jprime]) for idx_j in range(len(J)) for idx_jprime in range(idx_j + 1, len(J))]
     abdev = model.addVars(J_pairs, vtype=GRB.CONTINUOUS, lb=0, name="abdev")
 
     # 2. Objective (Eq. 31)
-    model.setObjective(
-        gp.quicksum(abdev[j, jprime] for j, jprime in J_pairs),
-        GRB.MINIMIZE
-    )
+    model.setObjective(gp.quicksum(abdev[j, jprime] for j, jprime in J_pairs),
+        GRB.MINIMIZE)
 
     # 3. Constraints carried over from Step 2 (Eqs. 9, 18-25)
 
     # (9) Maintain maximum preferences
-    model.addConstr(
-        gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1,
-        name="MaintainPreferences"
-    )
+    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1,
+        name="MaintainPreferences")
 
     # (18) Each student assigned to exactly one seminar
-    model.addConstrs(
-        (gp.quicksum(x[i, j] for j in J) == 1 for i in I),
-        name="SingleAssignment"
-    )
+    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I),
+        name="SingleAssignment" )
 
     # (19) Each block l (up to r_lb[j]) filled by at most one student
-    model.addConstrs(
-        (gp.quicksum(
-            y_bar[i, j, l_bar, l]
-            for i in I
-            for l_bar in sizes[j] if l_bar >= l
-        ) <= 1
-         for j in J
-         for l in range(1, r_lb[j] + 1)),
-        name="BlockCapacity"
-    )
+    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for i in I for l_bar in sizes[j] if l_bar >= l) <= 1 for j in J for l in range(1, r_lb[j] + 1)),
+        name="BlockCapacity")
 
     # (20) Student i in seminar j iff they occupy exactly one block
-    model.addConstrs(
-        (gp.quicksum(
-            y_bar[i, j, l_bar, l]
-            for l_bar in sizes[j]
-            for l in range(1, l_bar + 1)
-        ) == x[i, j]
-         for i in I for j in J),
-        name="StudentBlockLink"
-    )
+    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
+        name="StudentBlockLink")
 
     # (21) y_bar bounded by w
-    model.addConstrs(
-        (y_bar[i, j, l_bar, l] <= w[j, l_bar]
-         for i in I
-         for j in J
-         for l_bar in sizes[j]
-         for l in range(1, l_bar + 1)),
-        name="BlockSizeLink"
-    )
+    model.addConstrs((y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
+        name="BlockSizeLink")
 
     # (22) Chosen size must equal actual number of students in seminar j
-    model.addConstrs(
-        (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])
-         == gp.quicksum(x[i, j] for i in I)
-         for j in J),
-        name="SeminarSizeConsistency"
-    )
+    model.addConstrs((gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j]) == gp.quicksum(x[i, j] for i in I) for j in J),
+        name="SeminarSizeConsistency")
 
     # (23) Exactly one size chosen per seminar
-    model.addConstrs(
-        (gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
-        name="OneSizePerSeminar"
-    )
+    model.addConstrs((gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
+        name="OneSizePerSeminar")
 
     # 4. Step 3 constraints
 
     # (30) Maintain maximum diversity Z from Step 2
-    model.addConstr(
-        gp.quicksum(
-            c_weights[l_bar][l] * a[i] * y_bar[i, j, l_bar, l]
-            for i in I
-            for j in J
-            for l_bar in sizes[j]
-            for l in range(1, l_bar + 1)
-        ) == Z_step2,
-        name="MaintainDiversity"
-    )
+    model.addConstr(gp.quicksum(c_weights[l_bar][l] * a[i] * y_bar[i, j, l_bar, l] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)) == Z_step2,
+        name="MaintainDiversity")
 
     # (32) and (33) Linearization of absolute deviation between seminar pairs
     for j, jprime in J_pairs:
