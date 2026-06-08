@@ -2,8 +2,7 @@ import gurobipy as gp
 from gurobipy import GRB
 import math
 from data import generate_sapp_data
-#test commit
-#s 
+
 # STEP 1: 4.1 Step 1 — Preference-maximal assignment (for equal and unequal seminar sizes)
 def step1_preference_maximal_assignment(I, J, p, r_min, r_max):
     """
@@ -114,6 +113,58 @@ def calculate_diversity_weights(num_blocks):
     return c
 
 
+# Shared constraint helpers
+def add_preference_and_assignment_constraints(model, x, I, J, p, F_step1):
+    """
+    Adds constraints shared across Steps 2 and 3 for both equal and unequal sized seminars.
+    
+    (9)  Maintain preference optimality from Step 1
+    (12)/(18) Each student assigned to exactly one seminar
+    """
+    # (9) Maintain preferences F from Step 1
+    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1, name="MaintainPreferences")
+    # (12)/(18) Single assignment
+    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I), name="SingleAssignment")
+
+def add_equal_block_constraints(model, x, y, I, J, L):
+    """
+    Adds block assignment constraints shared across Steps 2 and 3 for equal-sized seminars.
+
+    (13) Each block l in each seminar j receives exactly one student
+    (14) A student can only be assigned to a block in seminar j if they are assigned to seminar j
+    """
+    # (13) Block completion
+    model.addConstrs((gp.quicksum(y[l, i, j] for i in I) == 1 for j in J for l in L), name="BlockCompletion")
+    # (14) Student in block
+    model.addConstrs((gp.quicksum(y[l, i, j] for l in L) == x[i, j] for i in I for j in J), name="StudentInBlock")
+
+def add_unequal_block_constraints(model, x, w, y_bar, I, J, sizes, r_lb):
+    """
+    Adds block assignment constraints shared across Steps 2 and 3 for unequal-sized seminars.
+
+    (19) Each block l (up to r_lb[j]) is filled by at most one student across all valid seminar sizes l_bar >= l
+    (20) Student i in seminar j iff they occupy exactly one block across all valid (l_bar, l) combinations
+    (21) y_bar[i,j,l_bar,l] <= w[j, l_bar]
+    (22) The chosen size l_bar must equal the actual number of students in j
+    (23) Exactly one size is chosen per seminar
+    """
+    # (19) Each block l (up to r_lb[j]) is filled by at most one student across all valid seminar sizes l_bar >= l
+    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for i in I for l_bar in sizes[j] if l_bar >= l) <= 1
+         for j in J
+         for l in range(1, r_lb[j] + 1)),
+        name="BlockCapacity")
+    # (20) Student i in seminar j iff they occupy exactly one block across all valid (l_bar, l) combinations for that seminar
+    model.addConstrs( (gp.quicksum( y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
+        name="StudentBlockLink")
+    # (21) y_bar[i,j,l_bar,l] <= w[j, l_bar]  Can only place student in block (l_bar, l) if seminar j has size l_bar
+    model.addConstrs( (y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
+        name="BlockSizeLink")
+    # (22) The chosen size l_bar must equal the actual number of students in j
+    model.addConstrs( (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])== gp.quicksum(x[i, j] for i in I) for j in J),
+        name="SeminarSizeConsistency")
+    # (23) Exactly one size is chosen per seminar
+    model.addConstrs( (gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
+        name="OneSizePerSeminar")
 
 
 # Step 2: Maximally Diverse Grouping Problem (Equal-sized)
@@ -161,17 +212,8 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
     )
 
     # 3. Constraints
-    # (9) Maintain preferences F from Step 1
-    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1, name="MaintainPreferences")
-
-    # Constraint (12): Each student must be assigned to exactly one seminar
-    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I), name="SingleAssignment")
-
-    # (13) Each block l in each seminar j receives exactly one student
-    model.addConstrs((gp.quicksum(y[l, i, j] for i in I) == 1 for j in J for l in L), name="BlockCompletion")
-
-    # (14) A student can only be assigned to a block in seminar j if they are assigned to seminar j
-    model.addConstrs((gp.quicksum(y[l, i, j] for l in L) == x[i, j] for i in I for j in J), name="StudentInBlock")
+    add_preference_and_assignment_constraints(model, x, I, J, p, F_step1)
+    add_equal_block_constraints(model, x, y, I, J, L)
 
     model.optimize()
     
@@ -184,6 +226,7 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
         return Z_e_1, optimal_assignment
     
     return None, None
+
 def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     """
     Step 2: Preference-maximal and maximally diverse assignment (Unequal-sized).
@@ -230,7 +273,7 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     # y_bar[i, j, l_bar, l] = 1 if student i is in block l of seminar j
     #when seminar j has l_bar students  (Eq. 17)    
     y_bar = model.addVars([(i, j, l_bar, l) for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)],
-        vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="y_bar")   )
+        vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="y_bar")   
 
     #2. Objective (Eq. 17)
     model.setObjective(
@@ -238,33 +281,8 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
         GRB.MAXIMIZE)
 
     #3. Constraints
-     # (9) Maintain preferences F from Step 1
-    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1, name="MaintainPreferences")
-
-    # (18) Each student assigned to exactly one seminar
-    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I), name="SingleAssignment")
-
-    # (19) Each block l (up to r_lb[j]) is filled by at most one student across all valid seminar sizes l_bar >= l
-    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for i in I for l_bar in sizes[j] if l_bar >= l) <= 1
-         for j in J
-         for l in range(1, r_lb[j] + 1)),
-        name="BlockCapacity")
-
-    # (20) Student i in seminar j iff they occupy exactly one block across all valid (l_bar, l) combinations for that seminar
-    model.addConstrs( (gp.quicksum( y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
-        name="StudentBlockLink")
-
-    # (21) y_bar[i,j,l_bar,l] <= w[j, l_bar  Can only place student in block (l_bar, l) if seminar j has size l_bar
-    model.addConstrs( (y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
-        name="BlockSizeLink")
-
-    # (22) The chosen size l_bar must equal the actual number of students in j
-    model.addConstrs( (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])== gp.quicksum(x[i, j] for i in I) for j in J),
-        name="SeminarSizeConsistency")
-
-    # (23) Exactly one size is chosen per seminar
-    model.addConstrs( (gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
-        name="OneSizePerSeminar")
+    add_preference_and_assignment_constraints(model, x, I, J, p, F_step1)
+    add_unequal_block_constraints(model, x, w, y_bar, I, J, sizes, r_lb)
 
     model.optimize()
 
@@ -274,6 +292,7 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
         return Z_u_1, optimal_assignment
 
     return None, None
+
 # Step 3: Balanced Assignment (Equal-sized)
 def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
     """
@@ -321,17 +340,8 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
     model.setObjective(gp.quicksum(abdev[j, jprime] for j, jprime in J_pairs), GRB.MINIMIZE)
 
     # 3. Old Constraints from Step 1 & 2
-    # (9) Maintain maximum preferences
-    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1, name="MaintainPreferences")
-    
-    # (12) Single assignment
-    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I), name="SingleAssignment")
-    
-    # (13) Block completion
-    model.addConstrs((gp.quicksum(y[l, i, j] for i in I) == 1 for j in J for l in L), name="BlockCompletion")
-    
-    # (14) Student in block
-    model.addConstrs((gp.quicksum(y[l, i, j] for l in L) == x[i, j] for i in I for j in J), name="StudentInBlock")
+    add_preference_and_assignment_constraints(model, x, I, J, p, F_step1)
+    add_equal_block_constraints(model, x, y, I, J, L)
 
     # 4. Constraints for Step 3
     # (26) Maintain maximum diversity (Z) found in Step 2
@@ -360,6 +370,7 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
         return balance_score, optimal_assignment
     
     return None, None
+
 def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
     """
     Step 3: Preference-maximal, maximally diverse, and balanced assignment (Unequal-sized).
@@ -412,34 +423,8 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
         GRB.MINIMIZE)
 
     # 3. Constraints carried over from Step 2 (Eqs. 9, 18-25)
-
-    # (9) Maintain maximum preferences
-    model.addConstr(gp.quicksum((2 ** p[i, j]) * x[i, j] for i in I for j in J) == F_step1,
-        name="MaintainPreferences")
-
-    # (18) Each student assigned to exactly one seminar
-    model.addConstrs((gp.quicksum(x[i, j] for j in J) == 1 for i in I),
-        name="SingleAssignment" )
-
-    # (19) Each block l (up to r_lb[j]) filled by at most one student
-    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for i in I for l_bar in sizes[j] if l_bar >= l) <= 1 for j in J for l in range(1, r_lb[j] + 1)),
-        name="BlockCapacity")
-
-    # (20) Student i in seminar j iff they occupy exactly one block
-    model.addConstrs((gp.quicksum(y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
-        name="StudentBlockLink")
-
-    # (21) y_bar bounded by w
-    model.addConstrs((y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
-        name="BlockSizeLink")
-
-    # (22) Chosen size must equal actual number of students in seminar j
-    model.addConstrs((gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j]) == gp.quicksum(x[i, j] for i in I) for j in J),
-        name="SeminarSizeConsistency")
-
-    # (23) Exactly one size chosen per seminar
-    model.addConstrs((gp.quicksum(w[j, l_bar] for l_bar in sizes[j]) == 1 for j in J),
-        name="OneSizePerSeminar")
+    add_preference_and_assignment_constraints(model, x, I, J, p, F_step1)
+    add_unequal_block_constraints(model, x, w, y_bar, I, J, sizes, r_lb)
 
     # 4. Step 3 constraints
 
@@ -475,6 +460,7 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
         return balance_score, optimal_assignment
 
     return None, None
+
 if __name__ == "__main__":
     # Generate test data for SAPP
     num_students = 100
