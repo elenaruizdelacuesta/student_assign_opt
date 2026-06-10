@@ -34,6 +34,7 @@ def step1_preference_maximal_assignment(I, J, p, r_min, r_max):
     
     # Enable Gurobi log output to monitor the solver's progress
     model.Params.OutputFlag = 1 
+    model.Params.TimeLimit = 300
 
     # 2. Decision Variables (Equation 7)
     # x[i, j] is binary: 1 if student i is assigned to seminar j; 0 otherwise.
@@ -134,6 +135,7 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
     """
     model = gp.Model("SAPP_Step2_Diversity")
     model.Params.OutputFlag = 1
+    model.Params.TimeLimit = 300
     
     num_students = len(I)
     num_blocks = num_students // len(J)
@@ -205,6 +207,7 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
     """
     model = gp.Model("SAPP_Step3_Balancing")
     model.Params.OutputFlag = 1
+    model.Params.TimeLimit = 300
     
     num_students = len(I)
     num_blocks = num_students // len(J)

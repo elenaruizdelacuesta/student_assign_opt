@@ -23,10 +23,10 @@ def run_equal_sized_test():
     """
     Executes the test for equal-sized seminars
     """
-    # TEST 1: EQUAL-SIZED SEMINARS (10 students, 2 seminars)
-    print("\nTEST 1: EQUAL-SIZED SEMINARS (10 students, 2 seminars)")
-    num_students = 10
-    num_seminars = 2
+    # TEST 1: EQUAL-SIZED SEMINARS (18 students, 3 seminars)
+    print("\nTEST 1: EQUAL-SIZED SEMINARS (18 students, 3 seminars)")
+    num_students = 30
+    num_seminars = 3
     
     # 1. Generate Data
     I, J, p, r_min, r_max, a = generate_sapp_data(num_students, num_seminars, equal_sized=True)
@@ -72,3 +72,4 @@ if __name__ == "__main__":
     run_equal_sized_test()
 
     # Run the unequal-sized scenario
+    #run_unequal_sized_test()
