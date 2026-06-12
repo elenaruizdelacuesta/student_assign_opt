@@ -4,9 +4,9 @@
 This repository contains the implementation and computational analysis of the "Student Assignment Problem with Preferences" (SAPP), based on the methodology proposed by Schulz (2026). 
 
 The algorithm solves the assignment problem in three hierarchical steps:
-1. **Step 1:** Maximizing student preferences.
-2. **Step 2:** Maximizing diversity within groups (Maximally Diverse Grouping Problem).
-3. **Step 3:** Balancing diversity across different groups.
+- **Step 1:** Maximizing student preferences.
+- **Step 2:** Maximizing diversity within groups (Maximally Diverse Grouping Problem).
+- **Step 3:** Balancing diversity across different groups.
 
 Two variants of the model are analyzed and compared:
 * **Equal-Sized Seminars:** Strictly rigid and equal capacity for all classrooms.
@@ -26,21 +26,20 @@ To run this project, you need the following components installed:
 * `plot_results.py`: Visualization module. Reads the generated CSV files and builds line and stacked bar charts.
 
 ## Execution Instructions
-1. Run the preliminary tests:
-To verify that the solver and models are working correctly on small instances:
+1. Run the preliminary tests to verify that the solver and models are working correctly on small instances:
 ```bash
 python test.py
 ```
 2. Run the scalability file from the terminal:
-   ```bash
-   python scalability.py
-   ```
-You will need to choose the execution mode (1 for Equal-Sized or 2 for Unequal-Sized). The results will be saved in the results_equal/ or results_unequal/ folders.
+```bash
+python scalability.py
+```
+You will need to choose the execution mode (1 for Equal-Sized or 2 for Unequal-Sized). The results will be saved in the `results_equal/` or `results_unequal/` folders.
 3. Once the data is generated, run the visualization script to obtain the plots:
 ```bash
-   python plot_results.py
-   ```
-The images will be saved in the plots_equal/ or plots_unequal/ folders.
+python plot_results.py
+```
+The images will be saved in the `plots_equal/` or `plots_unequal/` folders.
 
 ## Results and Conclusions
 The experiments demonstrate the computational limit of the SAPP problem when real-world conditions (classroom flexibility) are applied. Both models were compared using the exact same seeds to guarantee a fair comparison. 
