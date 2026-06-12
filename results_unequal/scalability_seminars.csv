@@ -1,0 +1,5 @@
+Students,Seminars,Time_Step1(s),Time_Step2(s),Time_Step3(s),Total_Time(s),Avg_Gap_Step3(%),Optimal_Runs,TimeLimit_Runs
+60,2,0.025,1.45,1.581,3.055,0.0,5,0
+60,3,0.038,2.925,9.404,12.367,0.0,5,0
+60,4,0.023,3.635,12.307,15.965,0.0,5,0
+60,5,0.024,3.908,12.289,16.222,0.0,5,0

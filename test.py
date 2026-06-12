@@ -33,27 +33,47 @@ def run_equal_sized_test():
     
     print(f"\nGenerated Data: {num_students} students for {num_seminars} seminars.")
     print("Student Academic Scores (a_i):")
-    print(a)
+    print(a, "\n")
 
     # 2. Execute STEP 1
     print("\nSTEP 1: Maximize Preferences")
-    F_optimal, assignment_1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
-    print(f"Maximum Satisfaction (F) = {F_optimal}")
-    print_assignment(assignment_1, a)
+    F_optimal, assignment_1, gap1, status1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
+    #print(f"Maximum Satisfaction (F) = {F_optimal}")
+    #print_assignment(assignment_1, a)
     
     # 3. Execute STEP 2
     if F_optimal is not None:
+        print(f"\nStep 1 Completed: F = {F_optimal} | Status: {status1} | Gap: {gap1:.2%}")
+        
         print("\nSTEP 2: Maximize Academic Diversity")
-        Z_optimal, assignment_2 = solve_step2_equal_sized(I, J, p, F_optimal, a)
-        print(f"Total Diversity (Z) = {Z_optimal}")
-        print_assignment(assignment_2, a)
+        Z_optimal, assignment_2, gap2, status2 = solve_step2_equal_sized(I, J, p, F_optimal, a)
+        # print(f"Total Diversity (Z) = {Z_optimal}")
+        # print_assignment(assignment_2, a)
         
         # 4. Execute STEP 3
         if Z_optimal is not None:
+            print(f"\nStep 2 Completed: Z = {Z_optimal} | Status: {status2} | Gap: {gap2:.2%}")
+
             print("\nSTEP 3: Balancing Seminars")
-            balance_score, assignment_3 = solve_step3_equal_sized(I, J, p, F_optimal, Z_optimal, a)
-            print(f"Total Absolute Deviation (Balance Score) = {balance_score}")
-            print_assignment(assignment_3, a)
+            balance_score, assignment_3, gap3, status3 = solve_step3_equal_sized(I, J, p, F_optimal, Z_optimal, a)
+            #print(f"Total Absolute Deviation (Balance Score) = {balance_score}")
+            #print_assignment(assignment_3, a)
+            if balance_score is not None:
+                print(f"\nStep 3 Completed! Balance Score = {balance_score} | Status: {status3} | Gap: {gap3:.2%}")
+                print("\nFINAL ASSIGNMENT SUMMARY:")
+                print("="*50)
+
+                for j in J:
+                    assigned_students = [i for i, assigned_j in assignment_3.items() if assigned_j == j]
+                    
+                    print(f" SEMINAR {j} (Total: {len(assigned_students)} students)")
+                    
+                    for i in assigned_students:
+                        print(f" Student {i:2d}  |  Score: {a[i]:.2f}")
+                    
+                    print("-" * 50)
+            else:
+                print("\nFailed at Step 3.")
         else:
             print("Step 3 skipped because Step 2 failed.")
     else:
@@ -65,7 +85,7 @@ def run_unequal_sized_test():
     """
     # TEST 2: UNEQUAL-SIZED SEMINARS (10 students, 2 seminars)
     print("\nTEST 2: UNEQUAL-SIZED SEMINARS (10 students, 2 seminars)")
-    num_students = 10
+    num_students = 13
     num_seminars = 2
     
     # 1. Generate Data
@@ -73,27 +93,46 @@ def run_unequal_sized_test():
     
     print(f"\nGenerated Data: {num_students} students for {num_seminars} seminars.")
     print("Student Academic Scores (a_i):")
-    print(a)
+    print(a, "\n")
+    print(f"Capacities -> Min: {r_min}, Max: {r_max}\n")
 
     # 2. Execute STEP 1
     print("\nSTEP 1: Maximize Preferences")
-    F_optimal, assignment_1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
-    print(f"Maximum Satisfaction (F) = {F_optimal}")
-    print_assignment(assignment_1, a)
+    F_optimal, assignment_1, gap1, status1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
+    #print(f"Maximum Satisfaction (F) = {F_optimal}")
+    #print_assignment(assignment_1, a)
     
     # 3. Execute STEP 2
     if F_optimal is not None:
+        print(f"\nStep 1 Completed: F = {F_optimal} | Status: {status1} | Gap: {gap1:.2%}")
+        
         print("\nSTEP 2: Maximize Academic Diversity")
-        Z_optimal, assignment_2 = solve_step2_unequal_sized(I, J, p, r_min, r_max, F_optimal, a)
-        print(f"Total Diversity (Z) = {Z_optimal}")
-        print_assignment(assignment_2, a)
+        Z_optimal, assignment_2, gap2, status2 = solve_step2_unequal_sized(I, J, p, r_min, r_max, F_optimal, a)
+        #print(f"Total Diversity (Z) = {Z_optimal}")
+        #print_assignment(assignment_2, a)
         
         # 4. Execute STEP 3
         if Z_optimal is not None:
+            print(f"\nStep 2 Completed: Z = {Z_optimal} | Status: {status2} | Gap: {gap2:.2%}")
+            
             print("\nSTEP 3: Balancing Seminars")
-            balance_score, assignment_3 = solve_step3_unequal_sized(I, J, p, r_min, r_max, F_optimal, Z_optimal, a)
-            print(f"Total Absolute Deviation (Balance Score) = {balance_score}")
-            print_assignment(assignment_3, a)
+            balance_score, assignment_3, gap3, status3  = solve_step3_unequal_sized(I, J, p, r_min, r_max, F_optimal, Z_optimal, a)
+            if balance_score is not None:
+                print(f"\nStep 3 Completed: Balance Score = {balance_score} | Status: {status3} | Gap: {gap3:.2%}")
+                print("\nFINAL ASSIGNMENT SUMMARY")
+                print("="*50)
+
+                for j in J:
+                    assigned_students = [i for i, assigned_j in assignment_3.items() if assigned_j == j]
+                    
+                    print(f" SEMINAR {j} (Total: {len(assigned_students)} students)")
+                    
+                    for i in assigned_students:
+                        print(f" Student {i:2d}  |  Score: {a[i]:.2f}")
+                    
+                    print("-" * 50)
+            else: 
+                print("\nFailed at Step 3.")
         else:
             print("Step 3 skipped because Step 2 failed.")
     else:
@@ -105,11 +144,18 @@ if __name__ == "__main__":
     print(" SAPP MODEL TESTING (SMALL INSTANCES)")
     print("="*50)
     
-    # Fix the seed for deterministic results
-    random.seed(42) 
-    
-    # Run the equal-sized scenario
-    run_equal_sized_test()
+    print("Which test do you want to run?")
+    print("1. Equal-Sized Seminars")
+    print("2. Unequal-Sized Seminars")
 
-    # Run the unequal-sized scenario
-    run_unequal_sized_test()
+    choice = input("Choose 1 or 2: ")
+
+    random.seed(42) 
+    if choice == '1':
+        # Run the equal-sized scenario
+        run_equal_sized_test()
+    elif choice == '2':
+        # Run the unequal-sized scenario
+        run_unequal_sized_test()
+    else:
+        print("Invalid option. Exiting...")

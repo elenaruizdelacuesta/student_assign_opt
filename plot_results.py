@@ -38,12 +38,14 @@ def create_stacked_bar_chart(df, x_column, title, xlabel, output_filename):
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     plt.close() 
 
-def generate_all_equal_sized_plots():
-    print("Generating plots for Equal-Sized Seminars...")
+def generate_plots(mode="equal"):
+    """Generates plots for the specified mode (equal or unequal)."""
     
-    input_dir = "results_equal"
-    output_dir = "plots_equal"
+    input_dir = f"results_{mode}"
+    output_dir = f"plots_{mode}"
     os.makedirs(output_dir, exist_ok=True)
+
+    mode_title = "Equal-Sized" if mode == "equal" else "Unequal-Sized"
 
     # =====================================================================
     # EXPERIMENT 1: PROPORTIONAL GROWTH
@@ -52,14 +54,14 @@ def generate_all_equal_sized_plots():
     
     # Line chart
     create_line_chart(df_prop, 'Students', 
-                      'Scalability: Total Time vs. Instance Size (Proportional Growth)', 
+                      f'Scalability: Total Time vs. Instance Size (Proportional Growth, {mode_title})', 
                       'Number of Students (|I|) & Proportionally Increasing Seminars', 
                       f'{output_dir}/plot_1_proportional_line.png')
 
     # Stacked Bar Chart
     create_stacked_bar_chart(df_prop, 'Students', 
-                             'Execution Time (Proportional Growth)', 
-                             'Number of Students (|I|)', 
+                             f'Execution Time Breakdown (Proportional Growth, {mode_title})', 
+                             'Number of Students (|I|) & Proportionally Increasing Seminars', 
                              f'{output_dir}/plot_1_proportional_stacked.png')
 
     # =====================================================================
@@ -67,11 +69,11 @@ def generate_all_equal_sized_plots():
     # =====================================================================
     df_stud = pd.read_csv(f'{input_dir}/scalability_students.csv')
     create_line_chart(df_stud, 'Students',
-                      'Scalability: Total Time vs. Number of Students (Fixed Seminars |J|=5)', 
+                      f'Scalability: Total Time vs. Number of Students (Fixed Seminars |J|=5, {mode_title})', 
                       'Number of Students (|I|)', 
                       f'{output_dir}/plot_2_students_line.png')
     create_stacked_bar_chart(df_stud, 'Students', 
-                             'Execution Time Breakdown (Fixed Seminars |J|=5)', 
+                             f'Execution Time Breakdown (Fixed Seminars |J|=5, {mode_title})', 
                              'Number of Students (|I|)', 
                              f'{output_dir}/plot_2_students_stacked.png')
 
@@ -80,15 +82,16 @@ def generate_all_equal_sized_plots():
     # =====================================================================
     df_sem = pd.read_csv(f'{input_dir}/scalability_seminars.csv')
     create_line_chart(df_sem, 'Seminars',
-                      'Scalability: Total Time vs. Number of Seminars (Fixed Students |I|=120)', 
+                      f'Scalability: Total Time vs. Number of Seminars (Fixed Students |I|=60, {mode_title})', 
                       'Number of Seminars (|J|)', 
                       f'{output_dir}/plot_3_seminars_line.png')
     create_stacked_bar_chart(df_sem, 'Seminars', 
-                             'Execution Time Breakdown (Fixed Students |I|=120)', 
+                             f'Execution Time Breakdown (Fixed Students |I|=60, {mode_title})', 
                              'Number of Seminars (|J|)', 
                              f'{output_dir}/plot_3_seminars_stacked.png')
     
     print(f"All plots generated in folder '{output_dir}/'")
 
 if __name__ == "__main__":
-    generate_all_equal_sized_plots()
+    generate_plots(mode="equal")
+    generate_plots(mode="unequal")

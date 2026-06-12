@@ -74,10 +74,16 @@ def step1_preference_maximal_assignment(I, J, p, r_min, r_max):
         # Map the resulting assignment by reading the values of the binary variables
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
         
-        return F, optimal_assignment
+        return F, optimal_assignment, model.MIPGap, "OPTIMAL"
+    elif model.Status == GRB.TIME_LIMIT:
+        if model.SolCount > 0:
+            F = model.ObjVal
+            optimal_assignment = { i: j for i in I for j in J if x[i, j].X > 0.5 }
+            return F, optimal_assignment, model.MIPGap, "TIME_LIMIT"
+        else:
+            return None, None, None, "TIME_LIMIT_NO_SOLUTION"
     else:
-        print("\n[Step 1] Error: The solver could not find a feasible or optimal solution.")
-        return None, None
+        return None, None, None, "NO_SOLUTION"
 
 # Preprocessing for Step 2: Diversity weights
 def calculate_diversity_weights(num_blocks):
@@ -224,10 +230,16 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
         Z_e_1 = model.ObjVal
         # https://github.com/Gurobi/modeling-examples/blob/master/traveling_salesman/tsp.ipynb
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
-
-        return Z_e_1, optimal_assignment
-    
-    return None, None
+        return Z_e_1, optimal_assignment, model.MIPGap, "OPTIMAL"
+    elif model.Status == GRB.TIME_LIMIT:
+        if model.SolCount > 0:
+            Z_e_1 = model.ObjVal
+            optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
+            return Z_e_1, optimal_assignment, model.MIPGap, "TIME_LIMIT"
+        else:
+            return None, None, None, "TIME_LIMIT_NO_SOLUTION"
+    else:
+        return None, None, None, "NO_SOLUTION"
 
 def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     """
@@ -254,6 +266,7 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     """
     model = gp.Model("SAPP_Step2_Diversity_Unequal")
     model.Params.OutputFlag = 1
+    model.Params.TimeLimit = 300
 
     """All valid seminar sizes per seminar j
     sizes[j] = [r_lb[j], r_lb[j]+1, ..., r_up[j]] """
@@ -291,9 +304,16 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     if model.Status == GRB.OPTIMAL:
         Z_u_1 = model.ObjVal
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
-        return Z_u_1, optimal_assignment
-
-    return None, None
+        return Z_u_1, optimal_assignment, model.MIPGap, "OPTIMAL"
+    elif model.Status == GRB.TIME_LIMIT:
+        if model.SolCount > 0:
+            Z_u_1 = model.ObjVal
+            optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
+            return Z_u_1, optimal_assignment, model.MIPGap, "TIME_LIMIT"
+        else :
+            return None, None, None, "TIME_LIMIT_NO_SOLUTION"
+    else:
+        return None, None, None, "NO_SOLUTION"
 
 # Step 3: Balanced Assignment (Equal-sized)
 def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
@@ -370,9 +390,16 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
     if model.Status == GRB.OPTIMAL:
         balance_score = model.ObjVal
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
-        return balance_score, optimal_assignment
-    
-    return None, None
+        return balance_score, optimal_assignment, model.MIPGap, "OPTIMAL"
+    elif model.Status == GRB.TIME_LIMIT:
+        if model.SolCount > 0:
+            balance_score = model.ObjVal
+            optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
+            return balance_score, optimal_assignment, model.MIPGap, "TIME_LIMIT"
+        else :
+            return None, None, None, "TIME_LIMIT_NO_SOLUTION"
+    else:
+        return None, None, None, "NO_SOLUTION"
 
 def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
     """
@@ -403,6 +430,7 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
     """
     model = gp.Model("SAPP_Step3_Balancing_Unequal")
     model.Params.OutputFlag = 1
+    model.Params.TimeLimit = 300
 
     sizes = {j: list(range(r_lb[j], r_ub[j] + 1)) for j in J}
     c_weights = {
@@ -460,38 +488,13 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
     if model.Status == GRB.OPTIMAL:
         balance_score = model.ObjVal
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
-        return balance_score, optimal_assignment
-
-    return None, None
-
-if __name__ == "__main__":
-    # Generate test data for SAPP
-    num_students = 100
-    num_seminars = 5
-    equal_sized = False
-
-    I, J, p, r_min, r_max, a = generate_sapp_data(num_students, num_seminars, equal_sized)
-
-    # Step 1: Preference-maximal assignment
-    F_step1, assignment_step1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
-
-    if F_step1 is not None:
-        print(f"Step 1 Optimal Objective Value (F): {F_step1}")
-        print(f"Step 1 Assignment: {assignment_step1}")
-
-        # Step 2: Preference-maximal and maximally diverse assignment (Equal-sized)
-        Z_e_1, assignment_step2 = solve_step2_unequal_sized(I, J, p,r_min, r_max, F_step1, a)
-
-        if Z_e_1 is not None:
-            print(f"Step 2 Optimal Diversity Value (Z^e_1): {Z_e_1}")
-            print(f"Step 2 Assignment: {assignment_step2}")
-            final, assignment_step3 = solve_step3_unequal_sized(I, J, p, r_min, r_max, F_step1, Z_e_1, a)
-            if final is not None:
-                print(f"Step 3 Optimal Balance Score: {final}")
-                print(f"Step 3 Assignment: {assignment_step3}")
-            else:
-                print("No optimal solution found for Step 3.")
-        else:
-            print("No optimal solution found for Step 2.")
+        return balance_score, optimal_assignment, model.MIPGap, "OPTIMAL"
+    elif model.Status == GRB.TIME_LIMIT:
+        if model.SolCount > 0:
+            balance_score = model.ObjVal
+            optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
+            return balance_score, optimal_assignment, model.MIPGap, "TIME_LIMIT"
+        else :
+            return None, None, None, "TIME_LIMIT_NO_SOLUTION"
     else:
-        print("No optimal solution found for Step 1.")
+        return None, None, None, "NO_SOLUTION"
