@@ -163,10 +163,10 @@ def add_unequal_block_constraints(model, x, w, y_bar, I, J, sizes, r_lb):
         name="BlockCapacity")
     # (20) Student i in seminar j iff they occupy exactly one block across all valid (l_bar, l) combinations for that seminar
     model.addConstrs( (gp.quicksum( y_bar[i, j, l_bar, l] for l_bar in sizes[j] for l in range(1, l_bar + 1)) == x[i, j] for i in I for j in J),
-        name="StudentBlockLink")
+        name="VerifyBlockAssignment")
     # (21) y_bar[i,j,l_bar,l] <= w[j, l_bar]  Can only place student in block (l_bar, l) if seminar j has size l_bar
     model.addConstrs( (y_bar[i, j, l_bar, l] <= w[j, l_bar] for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)),
-        name="BlockSizeLink")
+        name="SizeBlockConsistency")
     # (22) The chosen size l_bar must equal the actual number of students in j
     model.addConstrs( (gp.quicksum(l_bar * w[j, l_bar] for l_bar in sizes[j])== gp.quicksum(x[i, j] for i in I) for j in J),
         name="SeminarSizeConsistency")
@@ -283,7 +283,7 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
 
     # x[i, j] = 1 if student i is assigned to seminar j  (Eq. 25)
     x = model.addVars(I, J, vtype=GRB.BINARY, name="x")
-    # w[j, l_bar] = 1 if seminar j has exactly l_bar students  (Eq. 24)
+    # w[j, l_bar] = 1 iff seminar j has exactly l_bar students  (Eq. 24)
     w = model.addVars( [(j, l_bar) for j in J for l_bar in sizes[j]],
         vtype=GRB.BINARY, name="w"    )
 
@@ -449,11 +449,11 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
         [(i, j, l_bar, l) for i in I for j in J for l_bar in sizes[j] for l in range(1, l_bar + 1)],
         vtype=GRB.CONTINUOUS, lb=0.0, ub=1.0, name="y_bar")
 
-    J_pairs = [(J[idx_j], J[idx_jprime]) for idx_j in range(len(J)) for idx_jprime in range(idx_j + 1, len(J))]
-    abdev = model.addVars(J_pairs, vtype=GRB.CONTINUOUS, lb=0, name="abdev")
+    j_pairs = [(J[idx_j], J[idx_jprime]) for idx_j in range(len(J)) for idx_jprime in range(idx_j + 1, len(J))]
+    abdev = model.addVars(j_pairs, vtype=GRB.CONTINUOUS, lb=0, name="abdev")
 
     # 2. Objective (Eq. 31)
-    model.setObjective(gp.quicksum(abdev[j, jprime] for j, jprime in J_pairs),
+    model.setObjective(gp.quicksum(abdev[j, jprime] for j, jprime in j_pairs),
         GRB.MINIMIZE)
 
     # 3. Constraints carried over from Step 2 (Eqs. 9, 18-25)
@@ -467,7 +467,7 @@ def solve_step3_unequal_sized(I, J, p, r_lb, r_ub, F_step1, Z_step2, a):
         name="MaintainDiversity")
 
     # (32) and (33) Linearization of absolute deviation between seminar pairs
-    for j, jprime in J_pairs:
+    for j, jprime in j_pairs:
         div_j = gp.quicksum(
             c_weights[l_bar][l] * a[i] * y_bar[i, j, l_bar, l]
             for i in I
