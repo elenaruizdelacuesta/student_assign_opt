@@ -33,19 +33,19 @@ def run_experiment_equal(experiment_name, scenarios, csv_filepath, num_iteration
 
             I, J, p, r_min, r_max, a = generate_sapp_data(num_students, num_seminars, equal_sized=True)
             
-            # --- STEP 1 ---
+            # STEP 1
             start_t1 = time.time()
             F_optimal, _, gap1, stat1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
             sum_t1 += (time.time() - start_t1)
             
-            # --- STEP 2 ---
+            # STEP 2 EQUAL
             start_t2 = time.time()
             Z_optimal = None
             if F_optimal is not None:
                 Z_optimal, _, gap2, stat2 = solve_step2_equal_sized(I, J, p, F_optimal, a)
                 sum_t2 += (time.time() - start_t2)
 
-            # --- STEP 3 ---
+            # STEP 3 EQUAL
             start_t3 = time.time()
             if Z_optimal is not None:
                 balance_score, _, gap3, stat3 = solve_step3_equal_sized(I, J, p, F_optimal, Z_optimal, a)
@@ -62,7 +62,7 @@ def run_experiment_equal(experiment_name, scenarios, csv_filepath, num_iteration
             if iteration % 5 == 0:
                 print(f"    ...Iteration {iteration}/{num_iterations} completed.")
         
-        # Promedios
+        # Average
         avg_t1 = sum_t1 / num_iterations
         avg_t2 = sum_t2 / num_iterations
         avg_t3 = sum_t3 / num_iterations
@@ -82,7 +82,7 @@ def run_experiment_equal(experiment_name, scenarios, csv_filepath, num_iteration
 
     df_results = pd.DataFrame(results)
     df_results.to_csv(csv_filepath, index=False)
-    print(f"\n>>> {experiment_name} finished! Saved to {csv_filepath} <<<\n")
+    print(f"\n{experiment_name} finished! Saved to {csv_filepath}\n")
 
 def run_experiment_unequal(experiment_name, scenarios, csv_filepath, num_iterations=5):
     print("\n" + "="*60)
@@ -98,25 +98,25 @@ def run_experiment_unequal(experiment_name, scenarios, csv_filepath, num_iterati
         optimal_count, time_limit_count = 0, 0
 
         for iteration in range(1, num_iterations + 1):
-            # IMPORTANTE: equal_sized=False
+            # IMPORTANT: equal_sized=False
             seed = 42 + num_students + num_seminars + iteration
             random.seed(seed)
 
             I, J, p, r_min, r_max, a = generate_sapp_data(num_students, num_seminars, equal_sized=False)
             
-            # STEP 1 (Es el mismo para ambos)
+            # STEP 1 
             start_t1 = time.time()
             F_optimal, _, gap1, stat1 = step1_preference_maximal_assignment(I, J, p, r_min, r_max)
             sum_t1 += (time.time() - start_t1)
             
-            # STEP 2 UNEQUAL (Necesita r_min y r_max)
+            # STEP 2 UNEQUAL 
             start_t2 = time.time()
             Z_optimal = None
             if F_optimal is not None:
                 Z_optimal, _, gap2, stat2 = solve_step2_unequal_sized(I, J, p, r_min, r_max, F_optimal, a)
                 sum_t2 += (time.time() - start_t2)
 
-            # STEP 3 UNEQUAL (Necesita r_min y r_max)
+            # STEP 3 UNEQUAL
             start_t3 = time.time()
             if Z_optimal is not None:
                 balance_score, _, gap3, stat3 = solve_step3_unequal_sized(I, J, p, r_min, r_max, F_optimal, Z_optimal, a)
@@ -141,7 +141,7 @@ def run_experiment_unequal(experiment_name, scenarios, csv_filepath, num_iterati
 
     df_results = pd.DataFrame(results)
     df_results.to_csv(csv_filepath, index=False)
-    print(f"\n>>> {experiment_name} finished! Saved to {csv_filepath} <<<\n")
+    print(f"\n{experiment_name} finished! Saved to {csv_filepath}\n")
 
 def run_all_scalability_tests(mode="equal"):
     print("="*60)
@@ -149,14 +149,14 @@ def run_all_scalability_tests(mode="equal"):
     print("="*60)
     output_dir = f"results_{mode}"
     os.makedirs(output_dir, exist_ok=True)
-    # 1. Crecimiento Proporcional (Mantenemos aulas exactas de 10 alumnos)
+
+    #scenarios_prop = [(20, 2), (30, 3), (40, 4), (50, 5), (70, 7), (100, 10), (1000, 100)]
     scenarios_prop = [(20, 2), (30, 3), (40, 4), (50, 5)]
-    
-    # 2. Aulas más llenas (Seminarios fijos en 5, múltiplo de 5 siempre)
+    #scenarios_full = [(25, 5), (50, 5), (75, 5), (100, 5), (125, 5), (1000, 5)]
     scenarios_full = [(25, 5), (50, 5), (75, 5), (100, 5), (125, 5)]
-    
-    # 3. Fragmentación (Alumnos fijos en 60. El 60 es divisible por 2, 3, 4 y 5)
+    #scenarios_frag = [(200, 2), (200, 3), (200, 4), (200, 5), (200, 8), (200, 10)]
     scenarios_frag = [(60, 2), (60, 3), (60, 4), (60, 5)]
+
     if mode == "equal":
         run_experiment_equal("Proportional Growth", scenarios_prop, f"{output_dir}/scalability_proportional.csv")
         run_experiment_equal("Fuller Classrooms", scenarios_full, f"{output_dir}/scalability_students.csv")

@@ -64,6 +64,7 @@ def step1_preference_maximal_assignment(I, J, p, r_min, r_max):
 
     # 5. Execute the Optimization
     model.optimize()
+    # model.Params.Symmetry = 2
 
     # 6. Results Extraction 
     if model.Status == GRB.OPTIMAL:
@@ -224,6 +225,7 @@ def solve_step2_equal_sized(I, J, p, F_step1, a):
     add_equal_block_constraints(model, x, y, I, J, L)
 
     model.optimize()
+    #model.Params.Symmetry = 2
     
     if model.Status == GRB.OPTIMAL:
         # Extract the maximum diversity value (Z^e_1)
@@ -300,7 +302,7 @@ def solve_step2_unequal_sized(I, J, p, r_lb, r_up, F_step1, a):
     add_unequal_block_constraints(model, x, w, y_bar, I, J, sizes, r_lb)
 
     model.optimize()
-
+    # model.Params.Symmetry = 2
     if model.Status == GRB.OPTIMAL:
         Z_u_1 = model.ObjVal
         optimal_assignment = {i: j for i in I for j in J if x[i, j].X > 0.5}
@@ -386,6 +388,7 @@ def solve_step3_equal_sized(I, J, p, F_step1, Z_step2, a):
         model.addConstr(div_jprime - div_j <= abdev[j, jprime], name=f"DevNeg_{j}_{jprime}")
 
     model.optimize()
+    #model.Params.Symmetry = 2
  
     if model.Status == GRB.OPTIMAL:
         balance_score = model.ObjVal

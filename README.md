@@ -20,7 +20,7 @@ To run this project, you need the following components installed:
 
 ## Code Structure
 * `data.py`: Contains the instance generator (`generate_sapp_data`). Creates random academic records and strict preferences to ensure the reproducibility of experiments using seeds.
-* `models.py`: Contains the mathematical logic and Gurobi solver constraints for the three steps of the algorithm, covering both the equal and unequal-sized versions.
+* `models.py`: Contains the mathematical logic and Gurobi solver constraints for the three steps of the algorithm, covering both the equal and unequal-sized versions. There is the option to use a symmetry function of Gurobi by uncommenting "model.Params.Symmetry = 2".
 * `test.py`: It executes samll instances of the SAPP problem for both equal and unequal-sized models. 
 * `scalability.py`: Executes the scalability tests (Proportional Growth, Fuller Classrooms, and Fragmentation) and exports the execution times to CSV files.
 * `plot_results.py`: Visualization module. Reads the generated CSV files and builds line and stacked bar charts.
@@ -35,6 +35,7 @@ python test.py
 python scalability.py
 ```
 You will need to choose the execution mode (1 for Equal-Sized or 2 for Unequal-Sized). The results will be saved in the `results_equal/` or `results_unequal/` folders.
+
 3. Once the data is generated, run the visualization script to obtain the plots:
 ```bash
 python plot_results.py
@@ -50,7 +51,7 @@ The main conclusion on the analysis is that the computational complexity of the 
 * In the **Unequal-Sized** model, introducing a 10% tolerance margin changes the mathematical formulation. The exact number of participants per seminar becomes an active variable rather than a constant. For the same 125 students and 5 seminars, the execution time exceeds 330 seconds, forcing the solver to reach the time limit. As a result, it returns a solution with an optimality gap of over 16%, meaning the execution terminated before the solver could mathematically prove that the found assignment was the absolute best possible.
 
 ### Complexity of the Balancing Phase (Step 3)
-The breakdown of execution times confirms that Steps 1 and 2 are solved efficiently in both scenarios. The performance drop occurs in **Step 3 (Balancing)** of the Unequal model. By allowing variable classroom sizes, the mathematical model is forced to expand its dimensions through the use of complex four-index variables. The solver must evaluate not only *which* students to swap to balance the academic scores, but also *how many* students should optimally be in each seminar, increasing the computational time. 
+The breakdown of execution times confirms that Steps 1 and 2 are solved efficiently in both scenarios. The performance drop occurs in **Step 3 (Balancing)** of the Unequal model. By allowing variable seminar sizes, the mathematical model is forced to expand its dimensions through the use of complex four-index variables. The solver must evaluate not only *which* students to swap to balance the academic scores, but also *how many* students should optimally be in each seminar, increasing the computational time. 
 
 ### Stabilization in the Fragmentation Experiments
 In the fragmentation experiments (keeping 60 students fixed and increasing the seminar offering from 2 to 5), the execution time curve was observed to flatten rather than grow exponentially.

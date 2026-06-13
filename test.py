@@ -83,8 +83,8 @@ def run_unequal_sized_test():
     """
     Executes the test for unequal-sized seminars
     """
-    # TEST 2: UNEQUAL-SIZED SEMINARS (10 students, 2 seminars)
-    print("\nTEST 2: UNEQUAL-SIZED SEMINARS (10 students, 2 seminars)")
+    # TEST 2: UNEQUAL-SIZED SEMINARS (13 students, 2 seminars)
+    print("\nTEST 2: UNEQUAL-SIZED SEMINARS (13 students, 2 seminars)")
     num_students = 13
     num_seminars = 2
     
